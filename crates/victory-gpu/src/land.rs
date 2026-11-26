@@ -562,7 +562,7 @@ pub(crate) unsafe fn piece(
     copy: *const crate::shadow::Shadow,
 ) -> u64 {
     // SAFETY: the caller's.
-    unsafe { piece_at(title, now, held, parts, take, notes, beside_on(), copy) }
+    unsafe { piece_at(title, (now, held), parts, take, notes, beside_on(), copy) }
 }
 
 /// [`piece`], and whether a view of ours is looked for.
@@ -571,8 +571,7 @@ pub(crate) unsafe fn piece(
 /// [`piece`]'s.
 unsafe fn piece_at(
     title: usize,
-    now: *const u8,
-    held: *mut u8,
+    (now, held): (*const u8, *mut u8),
     parts: &[(usize, usize)],
     take: bool,
     notes: &mut Notes,

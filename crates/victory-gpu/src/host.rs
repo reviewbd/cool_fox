@@ -2657,7 +2657,7 @@ struct Flight {
 
 /// One thing in the line of what waits for the card, in order.
 enum Late {
-    Run(Flight),
+    Run(Box<Flight>),
     /// A bottom-of-pipe write of the flight before it: address, what, bytes.
     Write(usize, crate::queue::Written, usize),
     /// A fence (its address) signalled behind the flights before it.
@@ -2882,7 +2882,7 @@ fn blame_stale(stale: &[(std::sync::Arc<crate::shadow::Shadow>, usize, usize)]) 
 /// title memory read, took `us`.
 #[cfg(feature = "diagnostics")]
 fn blamed(why: usize, us: u64) {
-    let (named, refused) = std::mem::replace(&mut *BLAMED.lock().unwrap_or_else(|e| e.into_inner()), (None, ""));
+    let (named, refused) = std::mem::take(&mut *BLAMED.lock().unwrap_or_else(|e| e.into_inner()));
     let (key, at) = match (why, named) {
         (WHY_READ | WHY_STALE, Some(named)) => named,
         (WHY_READ, None) => (("a host copy of what a copy done on the card wrote", refused, 0, 0, 0), 0),
@@ -3681,6 +3681,7 @@ fn late_line(frames: f64) {
 pub(crate) mod aside;
 pub(crate) mod awake;
 mod card_steps;
+#[cfg(any(test, feature = "diagnostics"))]
 pub(crate) mod indirects;
 #[cfg(feature = "diagnostics")]
 mod panel;
@@ -4853,7 +4854,7 @@ impl Host {
             let flights: Vec<&Flight> = items
                 .iter()
                 .filter_map(|l| match l {
-                    Late::Run(flight) => Some(flight),
+                    Late::Run(flight) => Some(flight.as_ref()),
                     _ => None,
                 })
                 .collect();
@@ -5196,7 +5197,7 @@ impl Host {
             );
             *flying += order.len();
             *target = *submitted;
-            items.push(Late::Run(Flight {
+            items.push(Late::Run(Box::new(Flight {
                 number: sent.number,
                 fence: *target,
                 lists,
@@ -5205,7 +5206,7 @@ impl Host {
                 back: sent.back,
                 own: sent.own,
                 texture_back_ranges: sent.texture_back_ranges,
-            }));
+            })));
             items.extend(sent.writes.into_iter().map(|(at, what, bytes)| Late::Write(at, what, bytes)));
             *flying >= late_most()
         };
@@ -5251,7 +5252,7 @@ impl Host {
             );
             *flying += 1;
             *target = *submitted;
-            items.push(Late::Run(Flight {
+            items.push(Late::Run(Box::new(Flight {
                 number,
                 fence: *target,
                 lists: Vec::new(),
@@ -5260,7 +5261,7 @@ impl Host {
                 back: sent.back,
                 own: sent.own,
                 texture_back_ranges: sent.texture_back_ranges,
-            }));
+            })));
             items.extend(sent.writes.into_iter().map(|(at, what, bytes)| Late::Write(at, what, bytes)));
         }
         LATE_STATS[0].fetch_add(1, Ordering::Relaxed);
@@ -7739,7 +7740,9 @@ fn front_spans(steps: impl Iterator<Item = Touch>) -> Vec<(usize, usize, usize)>
                 given[i] = part;
             }
             Touch::Part => part += 1,
-            Touch::Title | Touch::Nothing => {}
+            #[cfg(test)]
+            Touch::Title => {},
+            Touch::Nothing => {}
         }
     }
     spans.retain(|s| s.1 < s.2);
@@ -7753,6 +7756,7 @@ enum Touch {
     /// The copy is given to shaders.
     Write(usize),
     /// Title memory is written.
+    #[cfg(test)]
     Title,
     Nothing,
     /// Another part of the submission begins.
@@ -7778,6 +7782,7 @@ fn written_spans(steps: impl Iterator<Item = Touch>) -> Vec<(usize, usize, usize
                     span.2 = true;
                 }
             }
+            #[cfg(test)]
             Touch::Title => break,
             Touch::Nothing | Touch::Part => {}
         }
@@ -7803,7 +7808,8 @@ mod written_spans_tests {
                 Refresh(1, 0, 100),
                 Write(3),
                 Refresh(3, 1, 2),
-                Title,
+                #[cfg(test)]
+    Title,
                 Refresh(4, 7, 9),
                 Part,
                 // The next part's bytes under the first one's writes.
@@ -7844,7 +7850,8 @@ mod written_spans_tests {
                 Refresh(3, 1, 2),
                 Refresh(4, 7, 9),
                 Write(4),
-                Title,
+                #[cfg(test)]
+    Title,
                 Write(2),
             ]
             .into_iter(),
