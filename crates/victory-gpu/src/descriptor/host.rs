@@ -5277,7 +5277,7 @@ mod tests {
             // SAFETY: a live buffer.
             unsafe { made.GetDesc() }.Width
         };
-        for (off, raw, len) in [(8, true, 128u64), (8, false, 4 * 456)] {
+        for (off, raw, len) in [(8, true, 128u64), (4, false, 4 * 456)] {
             let v = view(start + off, raw);
             assert_eq!(width(&v), len.next_multiple_of(256));
             let (copy, address, bytes) = buffer_copy(&v).unwrap();
