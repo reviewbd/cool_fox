@@ -1,8 +1,8 @@
 # VIctory on an RX 7900 XTX
 
-## Run the codec_d Windows build
+## Run the Windows portable build
 
-Download and extract the Windows x64 ZIP from the [private releases](https://github.com/codec-d/cool_fox/releases/latest). Open PowerShell in the extracted folder and point the launcher at your own complete Xbox dump.
+Download the `VIctory-windows-x64-portable` artifact from a successful [CI run](https://github.com/reviewbd/cool_fox/actions/workflows/ci.yml) and extract the ZIP. Open PowerShell in the extracted folder and point the launcher at your own complete Xbox dump.
 
 ```powershell
 $env:VICTORY_GAME_DIR = 'D:\Games\MyDump'

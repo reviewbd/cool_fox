@@ -1,6 +1,7 @@
 name: CI
 
 on:
+  workflow_dispatch:
   pull_request:
   push:
     branches: [main]
@@ -31,3 +32,30 @@ jobs:
       # Includes xtask's repository_passes_policy, the asset-policy check.
       - name: Tests
         run: cargo test --workspace --locked
+
+  portable:
+    runs-on: windows-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v5
+      - run: rustup toolchain install
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo build --release --locked -p victory
+      - name: Stage and verify portable runtime
+        run: |
+          $stage = Join-Path $env:RUNNER_TEMP 'VIctory portable'
+          New-Item -ItemType Directory $stage | Out-Null
+          $exe = Join-Path $stage 'victory-3d-rtx-pareto-residency.exe'
+          Copy-Item target/release/victory.exe $exe
+          Copy-Item Play-VIctory.cmd,README.md,LICENSE,victory.example.toml $stage
+          & $exe run --help
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          $env:VICTORY_GAME_DIR = Join-Path $env:RUNNER_TEMP 'missing game'
+          & "$stage/Play-VIctory.cmd" pareto-residency
+          if ($LASTEXITCODE -ne 2) { throw 'Expected the missing-game diagnostic' }
+          exit 0
+      - uses: actions/upload-artifact@v4
+        with:
+          name: VIctory-windows-x64-portable
+          path: ${{ runner.temp }}/VIctory portable/
+          if-no-files-found: error
